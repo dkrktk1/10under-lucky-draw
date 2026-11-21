@@ -1,0 +1,99 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Noto Sans KR", -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-display: "Barlow Condensed", "Noto Sans KR", sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+}
+
+@layer base {
+  html,
+  body {
+    font-family: var(--font-sans);
+    background-color: #080c14;
+    color: #f1f5f9;
+  }
+}
+
+.font-display {
+  font-family: var(--font-display);
+}
+
+.font-mono-num {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
+@keyframes shake-mild {
+  0%, 100% { transform: translate3d(0, 0, 0); }
+  25% { transform: translate3d(-2px, 1.5px, 0); }
+  50% { transform: translate3d(2px, -1.5px, 0); }
+  75% { transform: translate3d(-1.5px, -1px, 0); }
+}
+
+@keyframes shake-intense {
+  0%, 100% { transform: translate3d(0, 0, 0) rotate(0deg); }
+  15% { transform: translate3d(-5px, 3px, 0) rotate(-0.4deg); }
+  30% { transform: translate3d(5px, -3px, 0) rotate(0.4deg); }
+  45% { transform: translate3d(-4px, -3px, 0) rotate(-0.3deg); }
+  60% { transform: translate3d(4px, 4px, 0) rotate(0.3deg); }
+  75% { transform: translate3d(-3px, 2px, 0) rotate(-0.2deg); }
+  90% { transform: translate3d(3px, -2px, 0) rotate(0.2deg); }
+}
+
+@keyframes flash-burst {
+  0% { opacity: 0.9; transform: scale(0.92); }
+  100% { opacity: 0; transform: scale(1.18); }
+}
+
+@keyframes card-pop {
+  0% { opacity: 0; transform: scale(0.76) translateY(20px); }
+  65% { opacity: 1; transform: scale(1.04) translateY(-4px); }
+  100% { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.animate-shake-mild {
+  animation: shake-mild 0.14s linear infinite;
+}
+
+.animate-shake-intense {
+  animation: shake-intense 0.09s linear infinite;
+}
+
+.animate-flash-burst {
+  animation: flash-burst 0.65s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-card-pop {
+  animation: card-pop 0.48s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-shake-mild,
+  .animate-shake-intense {
+    animation: none;
+  }
+}
+
+/* Clean dark scrollbar for modals */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #0d1321;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #28354d;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #3b4f70;
+}

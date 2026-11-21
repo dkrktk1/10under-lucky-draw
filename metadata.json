@@ -1,0 +1,6 @@
+{
+  "name": "10UNDER 연말 총회 경품 추첨",
+  "description": "철인 3종 동호회 텐언더(10under) 연말 총회 현장 프로젝터용 회장님 FTP 폭발 스마트 로라 경품 추첨 웹앱",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

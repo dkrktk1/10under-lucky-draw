@@ -7,25 +7,25 @@ export const DEFAULT_PRIZES: Prize[] = [
     id: 'prize-garmin-965',
     name: '가민 포러너 965 GPS 철인 워치',
     totalQuantity: 1,
-    imageUrl: '/src/assets/images/prize_garmin_watch_1795183198262.jpg',
+    imageUrl: './src/assets/images/prize_garmin_watch_1795183198262.jpg',
   },
   {
     id: 'prize-oakley-sutro',
     name: '오클리 수트로 라이트 스포츠 고글',
     totalQuantity: 2,
-    imageUrl: '/src/assets/images/prize_cycling_sunglasses_1795183217490.jpg',
+    imageUrl: './src/assets/images/prize_cycling_sunglasses_1795183217490.jpg',
   },
   {
     id: 'prize-scicon-bag',
     name: '시콘 에어로컴포트 자전거 캐링백',
     totalQuantity: 1,
-    imageUrl: '/src/assets/images/prize_bike_travel_bag_1795183195837.jpg',
+    imageUrl: './src/assets/images/prize_bike_travel_bag_1795183195837.jpg',
   },
   {
     id: 'prize-maurten-gel',
     name: '모르텐 에너지젤 1박스 (12개입)',
     totalQuantity: 5,
-    imageUrl: '/src/assets/images/prize_energy_gel_box_1795183195323.jpg',
+    imageUrl: './src/assets/images/prize_energy_gel_box_1795183195323.jpg',
   },
 ];
 
@@ -66,7 +66,13 @@ export function loadAppState(): AppStorageState {
 
     const prizes =
       Array.isArray(parsed.prizes) && parsed.prizes.length > 0
-        ? parsed.prizes
+        ? parsed.prizes.map((p) => ({
+            ...p,
+            imageUrl:
+              typeof p.imageUrl === 'string' && p.imageUrl.startsWith('/src/assets/')
+                ? `.${p.imageUrl}`
+                : p.imageUrl,
+          }))
         : defaults.prizes;
 
     const selectedPrizeId =

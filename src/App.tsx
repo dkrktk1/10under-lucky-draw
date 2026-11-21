@@ -570,7 +570,7 @@ export default function App() {
         <h1 className="flex items-center gap-3 font-display text-2xl font-extrabold tracking-tight text-white whitespace-nowrap shrink-0 md:text-3xl">
           <span className="relative block h-8 w-[132px] shrink-0 overflow-hidden md:h-10 md:w-[164px]">
             <img
-              src="/assets/aistudio/__________fa1c2477.png"
+              src="./assets/aistudio/__________fa1c2477.png"
               alt="10under Triathlon Club"
               referrerPolicy="no-referrer"
               className="pointer-events-none absolute top-0 left-1/2 w-[126%] max-w-none -translate-x-1/2 -translate-y-[53.2%] select-none"
@@ -747,7 +747,7 @@ export default function App() {
           >
             <Flame className={`h-6 w-6 shrink-0 ${isDrawing ? 'animate-bounce' : ''}`} />
             {isDrawing ? (
-              <span>회장님 FTP 폭발 중...</span>
+              <span>추첨중...</span>
             ) : appState.availableNumbers.length === 0 ? (
               <span>남은 추첨 번호가 없습니다</span>
             ) : (

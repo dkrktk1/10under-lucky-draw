@@ -14,6 +14,7 @@ import { PrizePanel } from './components/PrizePanel';
 import { SettingsModal } from './components/SettingsModal';
 import { SmartTrainerStage } from './components/SmartTrainerStage';
 import { WinnerOverlay, RedrawResult } from './components/WinnerOverlay';
+import { INITIAL_PRIZES } from './data/prizes';
 import {
   AppStorageState,
   DrawPhase,
@@ -26,11 +27,11 @@ import {
 } from './types/raffle';
 import { soundEngine } from './utils/soundEngine';
 import {
-  DEFAULT_PRIZES,
   createDefaultState,
   generateNumberRange,
   loadAppState,
   loadAppStateAsync,
+  normalizeAssetPath,
   saveAppStateAsync,
   saveAppStateSync,
 } from './utils/storage';
@@ -227,16 +228,16 @@ export default function App() {
   const hasModifiedSetup = useMemo(() => {
     if (appState.poolStart !== 1 || appState.poolEnd !== 100) return true;
     if (appState.faces.calm || appState.faces.pain || appState.faces.cheer) return true;
-    if (appState.prizes.length !== DEFAULT_PRIZES.length) return true;
+    if (appState.prizes.length !== INITIAL_PRIZES.length) return true;
     return appState.prizes.some((p, i) => {
-      const d = DEFAULT_PRIZES[i];
+      const d = INITIAL_PRIZES[i];
       return (
         !d ||
         p.id !== d.id ||
         p.name !== d.name ||
         p.price !== d.price ||
         p.quantity !== d.quantity ||
-        p.image !== d.image
+        p.image !== normalizeAssetPath(d.image)
       );
     });
   }, [appState.poolStart, appState.poolEnd, appState.faces, appState.prizes]);
@@ -621,7 +622,7 @@ export default function App() {
   );
 
   const handleResetAllData = useCallback(() => {
-    const defaults = createDefaultState();
+    const defaults = createDefaultState(INITIAL_PRIZES);
     appStateRef.current = defaults;
     saveAppStateSync(defaults);
     setAppState(defaults);

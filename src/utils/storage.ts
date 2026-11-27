@@ -9,7 +9,7 @@ const IDB_STORE = 'app_state';
 const IDB_RECORD_KEY = 'current';
 const LARGE_DATA_URI_THRESHOLD = 48_000;
 
-export const DEFAULT_PRIZES: Prize[] = INITIAL_PRIZES;
+export const INITIAL_PRIZES_SIGNATURE = JSON.stringify(INITIAL_PRIZES);
 
 interface StoredEnvelope {
   savedAt: number;
@@ -60,14 +60,19 @@ export function generateNumberRange(start: number, end: number): number[] {
   return numbers;
 }
 
-export function createDefaultState(): AppStorageState {
+export function createDefaultState(initialPrizes: Prize[] = INITIAL_PRIZES): AppStorageState {
+  const prizesCopy = initialPrizes.map((p) => ({
+    ...p,
+    image: normalizeAssetPath(p.image),
+  }));
   return {
     version: 1,
+    prizesConfigSignature: INITIAL_PRIZES_SIGNATURE,
     poolStart: 1,
     poolEnd: 100,
     availableNumbers: generateNumberRange(1, 100),
-    prizes: INITIAL_PRIZES.map((p) => ({ ...p })),
-    selectedPrizeId: INITIAL_PRIZES[0]?.id ?? '',
+    prizes: prizesCopy,
+    selectedPrizeId: prizesCopy[0]?.id ?? '',
     winners: [],
     faces: {
       calm: null,
@@ -78,7 +83,10 @@ export function createDefaultState(): AppStorageState {
   };
 }
 
-export function sanitizeAppState(raw: unknown): AppStorageState {
+export function sanitizeAppState(
+  raw: unknown,
+  options?: { fromJsonImport?: boolean }
+): AppStorageState {
   const defaults = createDefaultState();
   if (!raw || typeof raw !== 'object') {
     return defaults;
@@ -122,21 +130,14 @@ export function sanitizeAppState(raw: unknown): AppStorageState {
       };
     });
 
-  const LEGACY_DEMO_IDS = [
-    'prize-garmin-965',
-    'prize-oakley-sutro',
-    'prize-scicon-bag',
-    'prize-maurten-gel',
-  ];
-  const parsedWinnersRaw = Array.isArray(parsed.winners) ? parsed.winners : [];
-  const isUntouchedLegacyDemo =
-    parsedWinnersRaw.length === 0 &&
-    validPrizes.length === LEGACY_DEMO_IDS.length &&
-    validPrizes.every((p, idx) => p.id === LEGACY_DEMO_IDS[idx]) &&
-    !INITIAL_PRIZES.every((p, idx) => p.id === LEGACY_DEMO_IDS[idx]);
+  // When src/data/prizes.ts has been updated in code since last save, auto-sync prizes from INITIAL_PRIZES
+  // (while preserving live winners, remaining pool, faces, and sound settings).
+  // For explicit JSON backup imports, always honor the backup file's exact prize list.
+  const configChangedInCode =
+    !options?.fromJsonImport && parsed.prizesConfigSignature !== INITIAL_PRIZES_SIGNATURE;
 
   const prizes =
-    validPrizes.length > 0 && !isUntouchedLegacyDemo ? validPrizes : defaults.prizes;
+    validPrizes.length > 0 && !configChangedInCode ? validPrizes : defaults.prizes;
 
   const selectedPrizeId =
     typeof parsed.selectedPrizeId === 'string' &&
@@ -189,6 +190,7 @@ export function sanitizeAppState(raw: unknown): AppStorageState {
 
   return {
     version: 1,
+    prizesConfigSignature: INITIAL_PRIZES_SIGNATURE,
     poolStart,
     poolEnd,
     availableNumbers,
@@ -493,7 +495,7 @@ export function parseImportedAppStateJson(
       };
     }
 
-    const sanitized = sanitizeAppState(candidate);
+    const sanitized = sanitizeAppState(candidate, { fromJsonImport: true });
     return { ok: true, state: sanitized };
   } catch {
     return {

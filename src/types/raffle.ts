@@ -48,6 +48,7 @@ export interface TelemetryState {
 
 export interface AppStorageState {
   version: number;
+  prizesConfigSignature?: string;
   poolStart: number;
   poolEnd: number;
   availableNumbers: number[];

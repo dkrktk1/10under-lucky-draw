@@ -13,7 +13,7 @@ import { HistoryModal } from './components/HistoryModal';
 import { PrizePanel } from './components/PrizePanel';
 import { SettingsModal } from './components/SettingsModal';
 import { SmartTrainerStage } from './components/SmartTrainerStage';
-import { WinnerOverlay } from './components/WinnerOverlay';
+import { WinnerOverlay, RedrawResult } from './components/WinnerOverlay';
 import {
   AppStorageState,
   DrawPhase,
@@ -26,10 +26,13 @@ import {
 } from './types/raffle';
 import { soundEngine } from './utils/soundEngine';
 import {
+  DEFAULT_PRIZES,
   createDefaultState,
   generateNumberRange,
   loadAppState,
-  saveAppState,
+  loadAppStateAsync,
+  saveAppStateAsync,
+  saveAppStateSync,
 } from './utils/storage';
 
 const SPRINT_DURATION_MS = 4600;
@@ -76,6 +79,10 @@ function pickRandomNumbers(pool: number[], count: number): {
 
 export default function App() {
   const [appState, setAppState] = useState<AppStorageState>(() => loadAppState());
+  const [isHydrated, setIsHydrated] = useState<boolean>(false);
+  const [storageBackend, setStorageBackend] = useState<'indexeddb' | 'localstorage' | 'default'>(
+    'indexeddb'
+  );
   const [phase, setPhase] = useState<DrawPhase>('IDLE');
   const [telemetry, setTelemetry] = useState<TelemetryState>(() => createIdleTelemetry());
 
@@ -94,18 +101,46 @@ export default function App() {
   const appStateRef = useRef<AppStorageState>(appState);
   appStateRef.current = appState;
 
+  // Hydrate complete state (including large Base64 photos) from IndexedDB on initial mount
+  useEffect(() => {
+    let active = true;
+    loadAppStateAsync()
+      .then(({ state, backend }) => {
+        if (!active) return;
+        appStateRef.current = state;
+        setAppState(state);
+        setStorageBackend(backend);
+        setIsHydrated(true);
+      })
+      .catch(() => {
+        if (!active) return;
+        setIsHydrated(true);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
   // Sync sound engine enabled flag
   useEffect(() => {
     soundEngine.setEnabled(appState.soundEnabled);
   }, [appState.soundEnabled]);
 
-  // Auto-persist to localStorage on state changes
+  // Auto-persist to IndexedDB (with localStorage fallback) on every state change after hydration
   useEffect(() => {
-    const result = saveAppState(appState);
-    if (!result.ok && result.error) {
-      setNotice(result.error);
-    }
-  }, [appState]);
+    if (!isHydrated) return;
+    let cancelled = false;
+    saveAppStateAsync(appState).then((result) => {
+      if (cancelled) return;
+      setStorageBackend(result.backend);
+      if (!result.ok && result.error) {
+        setNotice(result.error);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [appState, isHydrated]);
 
   // Clean up animation frames / audio on unmount
   useEffect(() => {
@@ -146,7 +181,7 @@ export default function App() {
     const counts: Record<string, number> = {};
     for (const p of appState.prizes) {
       const drawn = appState.winners.filter((w) => w.prizeId === p.id).length;
-      counts[p.id] = Math.max(0, p.totalQuantity - drawn);
+      counts[p.id] = Math.max(0, p.quantity - drawn);
     }
     return counts;
   }, [appState.prizes, appState.winners]);
@@ -159,7 +194,7 @@ export default function App() {
   );
 
   const selectedPrizeRemaining = selectedPrize
-    ? remainingMap[selectedPrize.id] ?? selectedPrize.totalQuantity
+    ? remainingMap[selectedPrize.id] ?? selectedPrize.quantity
     : 0;
 
   // Automatically sync drawCount when selected prize or its remaining count changes
@@ -188,11 +223,50 @@ export default function App() {
   const isDrawing =
     phase === 'WARMUP_Z1_Z3' || phase === 'THRESHOLD_Z4_Z5' || phase === 'SPRINT_Z6';
 
+  // Detect whether user has active draw history or custom setup in progress
+  const hasModifiedSetup = useMemo(() => {
+    if (appState.poolStart !== 1 || appState.poolEnd !== 100) return true;
+    if (appState.faces.calm || appState.faces.pain || appState.faces.cheer) return true;
+    if (appState.prizes.length !== DEFAULT_PRIZES.length) return true;
+    return appState.prizes.some((p, i) => {
+      const d = DEFAULT_PRIZES[i];
+      return (
+        !d ||
+        p.id !== d.id ||
+        p.name !== d.name ||
+        p.price !== d.price ||
+        p.quantity !== d.quantity ||
+        p.image !== d.image
+      );
+    });
+  }, [appState.poolStart, appState.poolEnd, appState.faces, appState.prizes]);
+
+  // Accidental refresh / tab close protection during live event or active setup
+  useEffect(() => {
+    const shouldWarn =
+      appState.winners.length > 0 || isDrawing || showSettings || hasModifiedSetup;
+    if (!shouldWarn) return;
+
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = '';
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [appState.winners.length, isDrawing, showSettings, hasModifiedSetup]);
+
   const handleSelectPrize = useCallback(
     (prizeId: string) => {
       if (isDrawing) return;
       soundEngine.playUiClick();
-      setAppState((prev) => ({ ...prev, selectedPrizeId: prizeId }));
+      const nextState: AppStorageState = {
+        ...appStateRef.current,
+        selectedPrizeId: prizeId,
+      };
+      appStateRef.current = nextState;
+      saveAppStateSync(nextState);
+      setAppState(nextState);
     },
     [isDrawing]
   );
@@ -201,12 +275,17 @@ export default function App() {
     (delta: number) => {
       if (isDrawing || appState.prizes.length <= 1) return;
       soundEngine.playUiClick();
-      setAppState((prev) => {
-        const idx = prev.prizes.findIndex((p) => p.id === prev.selectedPrizeId);
-        const safeIdx = idx === -1 ? 0 : idx;
-        const nextIdx = (safeIdx + delta + prev.prizes.length) % prev.prizes.length;
-        return { ...prev, selectedPrizeId: prev.prizes[nextIdx].id };
-      });
+      const current = appStateRef.current;
+      const idx = current.prizes.findIndex((p) => p.id === current.selectedPrizeId);
+      const safeIdx = idx === -1 ? 0 : idx;
+      const nextIdx = (safeIdx + delta + current.prizes.length) % current.prizes.length;
+      const nextState: AppStorageState = {
+        ...current,
+        selectedPrizeId: current.prizes[nextIdx].id,
+      };
+      appStateRef.current = nextState;
+      saveAppStateSync(nextState);
+      setAppState(nextState);
     },
     [isDrawing, appState.prizes.length]
   );
@@ -252,11 +331,14 @@ export default function App() {
       }));
       const createdIds = newRecords.map((r) => r.id);
 
-      setAppState((prev) => ({
-        ...prev,
+      const nextState: AppStorageState = {
+        ...appStateRef.current,
         availableNumbers: remaining,
-        winners: [...prev.winners, ...newRecords],
-      }));
+        winners: [...appStateRef.current.winners, ...newRecords],
+      };
+      appStateRef.current = nextState;
+      saveAppStateSync(nextState);
+      setAppState(nextState);
 
       soundEngine.playVictoryFanfare();
       setPhase('EXPLOSION');
@@ -391,23 +473,25 @@ export default function App() {
   // Return an absentee's number back to the pool and restore prize count (+1)
   const handleReturnWinner = useCallback(
     (recordId: string) => {
-      const target = appStateRef.current.winners.find((w) => w.id === recordId);
+      const current = appStateRef.current;
+      const target = current.winners.find((w) => w.id === recordId);
       if (!target) return;
 
       soundEngine.playUiClick();
 
-      setAppState((prev) => {
-        const nextWinners = prev.winners.filter((w) => w.id !== recordId);
-        const nextPool = prev.availableNumbers.includes(target.number)
-          ? prev.availableNumbers
-          : [...prev.availableNumbers, target.number].sort((a, b) => a - b);
+      const nextWinners = current.winners.filter((w) => w.id !== recordId);
+      const nextPool = current.availableNumbers.includes(target.number)
+        ? current.availableNumbers
+        : [...current.availableNumbers, target.number].sort((a, b) => a - b);
 
-        return {
-          ...prev,
-          winners: nextWinners,
-          availableNumbers: nextPool,
-        };
-      });
+      const nextState: AppStorageState = {
+        ...current,
+        winners: nextWinners,
+        availableNumbers: nextPool,
+      };
+      appStateRef.current = nextState;
+      saveAppStateSync(nextState);
+      setAppState(nextState);
 
       const nextRevealIds = latestRevealIds.filter((id) => id !== recordId);
       setLatestRevealIds(nextRevealIds);
@@ -420,6 +504,47 @@ export default function App() {
     },
     [latestRevealIds, showOverlay, flashNotice]
   );
+
+  // Individual card slot re-draw: swap 1 winner's number with a new number from the remaining pool
+  const handleRedrawWinner = useCallback((recordId: string): RedrawResult => {
+    const current = appStateRef.current;
+    const target = current.winners.find((w) => w.id === recordId);
+    if (!target) {
+      return { ok: false, error: '교체할 당첨 기록을 찾을 수 없습니다.' };
+    }
+
+    const pool = current.availableNumbers;
+    if (pool.length === 0) {
+      return { ok: false, error: '남은 추첨 번호가 없어 재추첨할 수 없습니다.' };
+    }
+
+    const pickIdx = Math.floor(Math.random() * pool.length);
+    const newNumber = pool[pickIdx];
+    const oldNumber = target.number;
+
+    const nextPool = [
+      ...pool.filter((n) => n !== newNumber),
+      ...(pool.includes(oldNumber) ? [] : [oldNumber]),
+    ].sort((a, b) => a - b);
+
+    const updatedAt = new Date().toISOString();
+    const nextWinners = current.winners.map((w) =>
+      w.id === recordId ? { ...w, number: newNumber, drawnAt: updatedAt } : w
+    );
+
+    const nextState: AppStorageState = {
+      ...current,
+      availableNumbers: nextPool,
+      winners: nextWinners,
+    };
+
+    // Update ref and persist synchronously so instant F5 or rapid redraws stay 100% consistent
+    appStateRef.current = nextState;
+    saveAppStateSync(nextState);
+    setAppState(nextState);
+
+    return { ok: true, oldNumber, newNumber };
+  }, []);
 
   // Settings handlers
   const handleAddPrize = useCallback((prizeData: Omit<Prize, 'id'>) => {
@@ -467,20 +592,38 @@ export default function App() {
 
   const handleResetPool = useCallback((start: number, end: number) => {
     const freshNumbers = generateNumberRange(start, end);
-    setAppState((prev) => ({
-      ...prev,
+    const nextState: AppStorageState = {
+      ...appStateRef.current,
       poolStart: start,
       poolEnd: end,
       availableNumbers: freshNumbers,
       winners: [],
-    }));
+    };
+    appStateRef.current = nextState;
+    saveAppStateSync(nextState);
+    setAppState(nextState);
     setLatestRevealIds([]);
     setShowOverlay(false);
     setPhase('IDLE');
   }, []);
 
+  const handleImportState = useCallback(
+    (imported: AppStorageState) => {
+      appStateRef.current = imported;
+      saveAppStateSync(imported);
+      setAppState(imported);
+      setLatestRevealIds([]);
+      setShowOverlay(false);
+      setPhase('IDLE');
+      flashNotice('JSON 백업 파일에서 데이터를 성공적으로 복원했습니다.');
+    },
+    [flashNotice]
+  );
+
   const handleResetAllData = useCallback(() => {
     const defaults = createDefaultState();
+    appStateRef.current = defaults;
+    saveAppStateSync(defaults);
     setAppState(defaults);
     setLatestRevealIds([]);
     setShowOverlay(false);
@@ -768,6 +911,8 @@ export default function App() {
           records={latestRevealRecords}
           prize={selectedPrize}
           faces={appState.faces}
+          availableNumbers={appState.availableNumbers}
+          onRedrawWinner={handleRedrawWinner}
           onReturnWinner={handleReturnWinner}
           onClose={handleCloseWinnerOverlay}
         />
@@ -788,17 +933,21 @@ export default function App() {
       {/* SETTINGS & PRIZE MANAGEMENT MODAL */}
       {showSettings && (
         <SettingsModal
+          appState={appState}
           prizes={appState.prizes}
           faces={appState.faces}
           poolStart={appState.poolStart}
           poolEnd={appState.poolEnd}
           availableCount={appState.availableNumbers.length}
           winnersCount={appState.winners.length}
+          remainingMap={remainingMap}
+          storageBackend={storageBackend}
           onAddPrize={handleAddPrize}
           onUpdatePrize={handleUpdatePrize}
           onDeletePrize={handleDeletePrize}
           onUpdateFace={handleUpdateFace}
           onResetPool={handleResetPool}
+          onImportState={handleImportState}
           onResetAllData={handleResetAllData}
           onClose={() => setShowSettings(false)}
         />

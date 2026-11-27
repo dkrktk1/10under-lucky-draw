@@ -74,6 +74,51 @@ class RaffleSoundEngine {
     osc.stop(now + 0.065);
   }
 
+  public playSlotTick(progress: number): void {
+    const ctx = this.ensureContext();
+    if (!ctx) return;
+    const now = ctx.currentTime;
+    const safeP = Number.isFinite(progress) ? Math.max(0, Math.min(1, progress)) : 0;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'triangle';
+    const freq = 420 + safeP * 420;
+    osc.frequency.setValueAtTime(freq, now);
+    osc.frequency.exponentialRampToValueAtTime(freq * 0.65, now + 0.032);
+    gain.gain.setValueAtTime(0.065, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.035);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start(now);
+    osc.stop(now + 0.04);
+  }
+
+  public playSlotLock(): void {
+    const ctx = this.ensureContext();
+    if (!ctx) return;
+    const now = ctx.currentTime;
+    const notes = [
+      { freq: 783.99, delay: 0, dur: 0.14, vol: 0.13 }, // G5
+      { freq: 1046.5, delay: 0.08, dur: 0.34, vol: 0.16 }, // C6
+      { freq: 1567.98, delay: 0.12, dur: 0.28, vol: 0.08 }, // G6 sparkle
+    ];
+
+    for (const n of notes) {
+      const start = now + n.delay;
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(n.freq, start);
+      gain.gain.setValueAtTime(0.001, start);
+      gain.gain.linearRampToValueAtTime(n.vol, start + 0.015);
+      gain.gain.exponentialRampToValueAtTime(0.001, start + n.dur);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(start);
+      osc.stop(start + n.dur + 0.03);
+    }
+  }
+
   public startSprintAudio(): void {
     const ctx = this.ensureContext();
     if (!ctx) return;

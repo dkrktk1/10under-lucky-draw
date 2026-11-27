@@ -72,9 +72,43 @@
   animation: card-pop 0.48s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
+@keyframes bib-reroll {
+  0% {
+    transform: perspective(900px) rotateY(0deg) scale(0.97);
+  }
+  50% {
+    transform: perspective(900px) rotateY(180deg) scale(1.03);
+  }
+  100% {
+    transform: perspective(900px) rotateY(360deg) scale(0.97);
+  }
+}
+
+@keyframes bib-land {
+  0% {
+    transform: scale(0.9);
+  }
+  55% {
+    transform: scale(1.06);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.animate-bib-reroll {
+  animation: bib-reroll 0.32s linear infinite;
+}
+
+.animate-bib-land {
+  animation: bib-land 0.42s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .animate-shake-mild,
-  .animate-shake-intense {
+  .animate-shake-intense,
+  .animate-bib-reroll,
+  .animate-bib-land {
     animation: none;
   }
 }

@@ -26,15 +26,23 @@ export function HistoryModal({
   const prizeMap = new Map<string, Prize>();
   prizes.forEach((p) => prizeMap.set(p.id, p));
 
-  const grouped = new Map<string, { prizeName: string; items: WinnerRecord[] }>();
+  const grouped = new Map<
+    string,
+    { prizeName: string; prizePrice: string; items: WinnerRecord[] }
+  >();
   for (const w of winners) {
     const existing = grouped.get(w.prizeId);
     const livePrize = prizeMap.get(w.prizeId);
     const displayName = livePrize ? livePrize.name : w.prizeName;
+    const displayPrice = livePrize ? livePrize.price : '';
     if (existing) {
       existing.items.push(w);
     } else {
-      grouped.set(w.prizeId, { prizeName: displayName, items: [w] });
+      grouped.set(w.prizeId, {
+        prizeName: displayName,
+        prizePrice: displayPrice,
+        items: [w],
+      });
     }
   }
 
@@ -148,8 +156,17 @@ export function HistoryModal({
                   className="border-b border-slate-800/80 pb-5 last:border-b-0 last:pb-0"
                 >
                   <div className="mb-3 flex items-baseline justify-between gap-3">
-                    <h3 className="text-base font-bold text-white">{group.prizeName}</h3>
-                    <span className="font-mono-num text-xs font-semibold text-slate-400">
+                    <div className="flex min-w-0 items-baseline gap-2">
+                      <h3 className="truncate text-base font-bold text-white">
+                        {group.prizeName}
+                      </h3>
+                      {group.prizePrice && (
+                        <span className="shrink-0 font-mono-num text-xs font-semibold text-amber-300/90">
+                          {group.prizePrice}
+                        </span>
+                      )}
+                    </div>
+                    <span className="shrink-0 font-mono-num text-xs font-semibold text-slate-400">
                       당첨 {group.items.length}명
                     </span>
                   </div>

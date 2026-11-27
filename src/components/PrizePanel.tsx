@@ -25,7 +25,7 @@ export function PrizePanel({
 
   useEffect(() => {
     setImgError(false);
-  }, [selectedPrize?.id, selectedPrize?.imageUrl]);
+  }, [selectedPrize?.id, selectedPrize?.image]);
 
   if (!selectedPrize) {
     return (
@@ -40,7 +40,7 @@ export function PrizePanel({
   }
 
   const currentIdx = prizes.findIndex((p) => p.id === selectedPrize.id);
-  const remaining = remainingMap[selectedPrize.id] ?? selectedPrize.totalQuantity;
+  const remaining = remainingMap[selectedPrize.id] ?? selectedPrize.quantity;
   const isSoldOut = remaining <= 0;
 
   return (
@@ -57,9 +57,9 @@ export function PrizePanel({
       <div className="my-4 flex flex-1 flex-col justify-center gap-4">
         {/* Prize Image Frame (4:3) */}
         <div className="relative aspect-[4/3] w-full overflow-hidden rounded-xl border border-slate-800 bg-[#090E1A]">
-          {selectedPrize.imageUrl && !imgError ? (
+          {selectedPrize.image && !imgError ? (
             <img
-              src={selectedPrize.imageUrl}
+              src={selectedPrize.image}
               alt={selectedPrize.name}
               referrerPolicy="no-referrer"
               onError={() => setImgError(true)}
@@ -86,7 +86,7 @@ export function PrizePanel({
           )}
         </div>
 
-        {/* Prize Name & Remaining Quantity */}
+        {/* Prize Name, Price & Remaining Quantity */}
         <div className="flex flex-col gap-2">
           <h2
             className="text-2xl font-black leading-snug tracking-tight text-white xl:text-[26px]"
@@ -94,6 +94,15 @@ export function PrizePanel({
           >
             {selectedPrize.name}
           </h2>
+
+          {selectedPrize.price && (
+            <div className="flex items-baseline justify-between pt-0.5">
+              <span className="text-xs font-medium text-slate-400">경품 금액</span>
+              <span className="font-mono-num text-lg font-extrabold text-amber-300 tabular-nums">
+                {selectedPrize.price}
+              </span>
+            </div>
+          )}
 
           <div className="flex items-baseline justify-between border-t border-slate-800/70 pt-2.5">
             <span className="text-sm font-medium text-slate-400">남은 수량</span>
@@ -106,7 +115,7 @@ export function PrizePanel({
                 {remaining}
               </span>
               <span className="text-base font-semibold text-slate-500">
-                / {selectedPrize.totalQuantity}개
+                / {selectedPrize.quantity}개
               </span>
             </div>
           </div>
@@ -140,7 +149,7 @@ export function PrizePanel({
         {prizes.length > 1 && (
           <div className="flex max-h-24 flex-col gap-1 overflow-y-auto pr-1">
             {prizes.map((p) => {
-              const rem = remainingMap[p.id] ?? p.totalQuantity;
+              const rem = remainingMap[p.id] ?? p.quantity;
               const isSelected = p.id === selectedPrize.id;
               return (
                 <button
@@ -154,9 +163,16 @@ export function PrizePanel({
                       : 'text-slate-400 hover:bg-slate-800/70 hover:text-slate-200'
                   } disabled:cursor-not-allowed`}
                 >
-                  <span className="truncate">{p.name}</span>
-                  <span className="shrink-0 font-mono-num text-[11px]">
-                    {rem}/{p.totalQuantity}
+                  <span className="min-w-0 truncate">{p.name}</span>
+                  <span className="flex shrink-0 items-center gap-1.5 font-mono-num text-[11px]">
+                    {p.price && (
+                      <span className={isSelected ? 'text-amber-300/90' : 'text-slate-500'}>
+                        {p.price}
+                      </span>
+                    )}
+                    <span>
+                      {rem}/{p.quantity}
+                    </span>
                   </span>
                 </button>
               );

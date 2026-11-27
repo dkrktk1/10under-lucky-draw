@@ -18,8 +18,9 @@ export interface PresidentFaces {
 export interface Prize {
   id: string;
   name: string;
-  totalQuantity: number;
-  imageUrl: string;
+  price: string;
+  quantity: number;
+  image: string;
 }
 
 export interface WinnerRecord {

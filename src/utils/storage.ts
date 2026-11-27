@@ -122,7 +122,21 @@ export function sanitizeAppState(raw: unknown): AppStorageState {
       };
     });
 
-  const prizes = validPrizes.length > 0 ? validPrizes : defaults.prizes;
+  const LEGACY_DEMO_IDS = [
+    'prize-garmin-965',
+    'prize-oakley-sutro',
+    'prize-scicon-bag',
+    'prize-maurten-gel',
+  ];
+  const parsedWinnersRaw = Array.isArray(parsed.winners) ? parsed.winners : [];
+  const isUntouchedLegacyDemo =
+    parsedWinnersRaw.length === 0 &&
+    validPrizes.length === LEGACY_DEMO_IDS.length &&
+    validPrizes.every((p, idx) => p.id === LEGACY_DEMO_IDS[idx]) &&
+    !INITIAL_PRIZES.every((p, idx) => p.id === LEGACY_DEMO_IDS[idx]);
+
+  const prizes =
+    validPrizes.length > 0 && !isUntouchedLegacyDemo ? validPrizes : defaults.prizes;
 
   const selectedPrizeId =
     typeof parsed.selectedPrizeId === 'string' &&
